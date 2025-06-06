@@ -9,19 +9,25 @@ void App::setup()
         delay(10);
 
     led.begin();
-    Response::send("System Ready", ResponseStatus::INFO);
+
+    pinMode(buttonPin, INPUT_PULLUP); // Button on GPIO0, active LOW
+
+    Response::send("System Ready", ResponseStatus::OK);
 }
 
 void App::loop()
 {
+    // Handle Serial Commands
     if (Serial.available() > 0)
     {
         String command = Serial.readStringUntil('\n');
         command.trim();
         command.toUpperCase();
-
         handleCommand(command);
     }
+
+    // Handle Button Press
+    handleButton();
 }
 
 void App::handleCommand(const String &cmd)
@@ -38,4 +44,17 @@ void App::handleCommand(const String &cmd)
         Response::send("Unknown command", ResponseStatus::ERR);
         break;
     }
+}
+
+void App::handleButton()
+{
+    bool buttonState = digitalRead(buttonPin);
+
+    // Detect falling edge (button press)
+    if (lastButtonState == HIGH && buttonState == LOW)
+    {
+        led.toggle();
+    }
+
+    lastButtonState = buttonState;
 }

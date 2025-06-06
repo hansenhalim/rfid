@@ -9,7 +9,10 @@ public:
     void begin();
     void on();
     void off();
+    void toggle();
+    bool isOn() const;
 
 private:
     uint8_t pin;
+    bool state; // true = ON
 };

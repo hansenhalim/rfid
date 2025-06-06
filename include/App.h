@@ -12,5 +12,9 @@ public:
 
 private:
     LEDController led;
+    const uint8_t buttonPin = 9;
+    bool lastButtonState = HIGH;
+
     void handleCommand(const String &cmd);
+    void handleButton();
 };
