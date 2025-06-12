@@ -1,6 +1,6 @@
 #include "App.h"
 
-App::App() : led(LED_BUILTIN) {}
+App::App() : led(LED_BUILTIN), rfid(10) {}
 
 void App::setup()
 {
@@ -9,6 +9,7 @@ void App::setup()
         delay(10);
 
     led.begin();
+    rfid.begin();
 
     pinMode(buttonPin, INPUT_PULLUP); // Button on GPIO0, active LOW
 
@@ -39,6 +40,12 @@ void App::handleCommand(const String &cmd)
         break;
     case CommandCode::LED_OFF:
         led.off();
+        break;
+    case CommandCode::RFID_ON:
+        rfid.on();
+        break;
+    case CommandCode::RFID_OFF:
+        rfid.off();
         break;
     default:
         Response::send("Unknown command", ResponseStatus::ERR);

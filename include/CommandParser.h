@@ -5,6 +5,8 @@ enum class CommandCode
 {
     LED_ON,
     LED_OFF,
+    RFID_ON,
+    RFID_OFF,
     UNKNOWN
 };
 

@@ -26,8 +26,3 @@ void LEDController::toggle()
 {
     state ? off() : on();
 }
-
-bool LEDController::isOn() const
-{
-    return state;
-}
