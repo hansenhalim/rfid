@@ -1,19 +1,15 @@
 #include "App.h"
 
-App::App() : led(LED_BUILTIN), rfid(10) {}
+App::App() {}
 
 void App::setup()
 {
-    Serial.begin(9600);
+    // Serial configuration per API spec: 115200, 8N1, no flow control
+    Serial.begin(115200);
     while (!Serial)
         delay(10);
 
-    led.begin();
     rfid.begin();
-
-    pinMode(buttonPin, INPUT_PULLUP); // Button on GPIO0, active LOW
-
-    Response::send("System Ready", ResponseStatus::OK);
 }
 
 void App::loop()
@@ -26,42 +22,65 @@ void App::loop()
         command.toUpperCase();
         handleCommand(command);
     }
-
-    // Handle Button Press
-    handleButton();
 }
 
 void App::handleCommand(const String &cmd)
 {
-    switch (CommandParser::parse(cmd))
+    ParsedCommand parsed = CommandParser::parse(cmd);
+
+    switch (parsed.code)
     {
-    case CommandCode::LED_ON:
-        led.on();
-        break;
-    case CommandCode::LED_OFF:
-        led.off();
-        break;
-    case CommandCode::RFID_ON:
-        rfid.on();
-        break;
-    case CommandCode::RFID_OFF:
-        rfid.off();
-        break;
+    case CommandCode::SCAN_UID:
+    {
+        String uid = rfid.scanUID();
+        if (uid.length() > 0)
+        {
+            Response::sendOK("UID " + uid);
+        }
+        else
+        {
+            Response::sendError("NO_TAG");
+        }
+    }
+    break;
+
+    case CommandCode::READ:
+    {
+        String data = rfid.readData(parsed.arg1);
+        if (data.length() > 0)
+        {
+            Response::sendOK("DATA " + data);
+        }
+        else
+        {
+            Response::sendError("AUTH_FAILED");
+        }
+    }
+    break;
+
+    case CommandCode::WRITE:
+    {
+        bool success = rfid.writeData(parsed.arg1, parsed.arg2);
+        if (success)
+        {
+            Response::sendOK("WRITE_DONE");
+        }
+        else
+        {
+            Response::sendError("WRITE_FAIL");
+        }
+    }
+    break;
+
+    case CommandCode::VERSION:
+    {
+        String version = rfid.getVersion();
+        Response::sendOK("VERSION " + version);
+    }
+    break;
+
     default:
-        Response::send("Unknown command", ResponseStatus::ERR);
+        Response::sendError("Unknown command");
         break;
     }
-}
-
-void App::handleButton()
-{
-    bool buttonState = digitalRead(buttonPin);
-
-    // Detect falling edge (button press)
-    if (lastButtonState == HIGH && buttonState == LOW)
-    {
-        led.toggle();
-    }
-
-    lastButtonState = buttonState;
 }

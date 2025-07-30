@@ -1,23 +1,23 @@
 #include "Response.h"
 
-String Response::statusToString(ResponseStatus r)
+void Response::sendOK(const String &message)
 {
-    switch (r)
-    {
-    case ResponseStatus::OK:
-        return "OK";
-    case ResponseStatus::ERR:
-        return "ERR";
-    case ResponseStatus::INFO:
-        return "INFO";
-    case ResponseStatus::TIMEOUT:
-        return "TIMEOUT";
-    default:
-        return "UNKNOWN";
-    }
+    Serial.println("OK " + message);
+}
+
+void Response::sendError(const String &message)
+{
+    Serial.println("ERR " + message);
 }
 
 void Response::send(const String &message, ResponseStatus status)
 {
-    Serial.println(statusToString(status) + ": " + message);
+    if (status == ResponseStatus::OK)
+    {
+        sendOK(message);
+    }
+    else
+    {
+        sendError(message);
+    }
 }

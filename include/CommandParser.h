@@ -3,15 +3,25 @@
 
 enum class CommandCode
 {
-    LED_ON,
-    LED_OFF,
-    RFID_ON,
-    RFID_OFF,
+    SCAN_UID,
+    READ,
+    WRITE,
+    VERSION,
     UNKNOWN
+};
+
+struct ParsedCommand
+{
+    CommandCode code;
+    String arg1;
+    String arg2;
 };
 
 class CommandParser
 {
 public:
-    static CommandCode parse(const String &cmd);
+    static ParsedCommand parse(const String &cmd);
+
+private:
+    static bool isValidHexString(const String &str, int expectedLength);
 };
