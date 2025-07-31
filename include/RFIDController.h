@@ -24,7 +24,7 @@ private:
     bool powerUpNFC();
     void powerDownNFC();
     bool initializeNFC();
-    String bytesToHex(uint8_t *data, uint8_t length);
+    String bytesToHex(uint8_t *data, uint16_t length);
     void hexToBytes(const String &hex, uint8_t *bytes);
     bool authenticateBlock(uint8_t blockNumber, uint8_t *key);
 };

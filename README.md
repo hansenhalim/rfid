@@ -55,7 +55,7 @@ Read data from an RFID tag using a given key.
 
 **Request:** `READ <key>`
 
-- `<key>`: 12-character hex string (6 bytes)
+- `<key>`: 192-character hex string (96 bytes - 16 sectors x 6 bytes each)
 
 **Response:**
 
@@ -65,8 +65,8 @@ Read data from an RFID tag using a given key.
 **Example:**
 
 ```
-> READ A0A1A2A3A4A5
-< OK DATA 11223344556677889900AABBCCDDEEFF
+> READ A0A1A2A3A4A5B0B1B2B3B4B5C0C1C2C3C4C5D0D1D2D3D4D5E0E1E2E3E4E5F0F1F2F3F4F5000102030405101112131415202122232425303132333435404142434445505152535455606162636465707172737475808182838485909192939495A0A1A2A3A4A5B0B1B2B3B4B5
+< OK DATA [1024 hex characters representing 512 bytes of payload data from blocks 1 and 2 of each sector 0-15]
 ```
 
 ### WRITE <KEY> <DATA>
@@ -75,8 +75,8 @@ Write data to an RFID tag using a given key.
 
 **Request:** `WRITE <key> <hex_data>`
 
-- `<key>`: 12-character hex string (6 bytes)
-- `<hex_data>`: Up to 32 hex characters (16 bytes)
+- `<key>`: 192-character hex string (96 bytes - 16 sectors x 6 bytes each)
+- `<hex_data>`: 1024 hex characters (512 bytes - 16 sectors x 2 blocks x 16 bytes each)
 
 **Response:**
 
@@ -86,7 +86,7 @@ Write data to an RFID tag using a given key.
 **Example:**
 
 ```
-> WRITE A0A1A2A3A4A5 DEADBEEFCAFEBABE1234567890ABCDEF
+> WRITE A0A1A2A3A4A5B0B1B2B3B4B5C0C1C2C3C4C5D0D1D2D3D4D5E0E1E2E3E4E5F0F1F2F3F4F5000102030405101112131415202122232425303132333435404142434445505152535455606162636465707172737475808182838485909192939495A0A1A2A3A4A5B0B1B2B3B4B5 DEADBEEFCAFEBABE1234567890ABCDEF[...continues for 1024 hex characters total...]
 < OK WRITE_DONE
 ```
 
@@ -144,6 +144,9 @@ This approach significantly reduces power consumption, making it suitable for ba
 - Commands are case-insensitive
 - All hex values in responses are uppercase
 - The implementation uses MIFARE Classic authentication with Key A
-- Data is read/written to block 4 (first data block after sector trailer)
+- Data is read/written from blocks 1 and 2 of each sector (sectors 0-15)
+- Block 0 of each sector is typically reserved for sector headers/keys
+- Key size: 96 bytes (192 hex chars) for 16 sectors x 6 bytes each
+- Payload size: 512 bytes (1024 hex chars) for 16 sectors x 2 blocks x 16 bytes each
 - Error handling includes proper response codes as per specification
 - Power optimization automatically manages PN532 power state for minimal consumption

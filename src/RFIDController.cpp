@@ -112,20 +112,83 @@ String RFIDController::readData(const String &key)
         return "";
     }
 
-    // Convert key from hex string to bytes
-    uint8_t keyBytes[6];
+    // Convert keys from hex string to bytes (96 bytes = 16 sectors x 6 bytes each)
+    uint8_t keyBytes[96];
     hexToBytes(key, keyBytes);
 
     String result = "";
-    // Try to authenticate and read from block 4 (first data block)
-    if (authenticateBlock(4, keyBytes))
+    uint8_t allData[512]; // 16 sectors x 2 blocks x 16 bytes = 512 bytes
+    int dataIndex = 0;
+    bool allSuccess = true;
+
+    // Read from sectors 0-15, blocks 1 and 2 of each sector
+    for (int sector = 0; sector < 16; sector++)
     {
-        uint8_t data[16];
-        success = nfc->mifareclassic_ReadDataBlock(4, data);
-        if (success)
+        // Get the key for this sector (6 bytes per sector)
+        uint8_t sectorKey[6];
+        for (int i = 0; i < 6; i++)
         {
-            result = bytesToHex(data, 16);
+            sectorKey[i] = keyBytes[sector * 6 + i];
         }
+
+        // Calculate block numbers for this sector
+        int block1 = sector * 4 + 1; // Block 1 of sector
+        int block2 = sector * 4 + 2; // Block 2 of sector
+
+        // Authenticate and read block 1
+        if (authenticateBlock(block1, sectorKey))
+        {
+            uint8_t blockData[16];
+            success = nfc->mifareclassic_ReadDataBlock(block1, blockData);
+            if (success)
+            {
+                // Copy block data to result array
+                for (int i = 0; i < 16; i++)
+                {
+                    allData[dataIndex++] = blockData[i];
+                }
+            }
+            else
+            {
+                allSuccess = false;
+                break;
+            }
+        }
+        else
+        {
+            allSuccess = false;
+            break;
+        }
+
+        // Authenticate and read block 2
+        if (authenticateBlock(block2, sectorKey))
+        {
+            uint8_t blockData[16];
+            success = nfc->mifareclassic_ReadDataBlock(block2, blockData);
+            if (success)
+            {
+                // Copy block data to result array
+                for (int i = 0; i < 16; i++)
+                {
+                    allData[dataIndex++] = blockData[i];
+                }
+            }
+            else
+            {
+                allSuccess = false;
+                break;
+            }
+        }
+        else
+        {
+            allSuccess = false;
+            break;
+        }
+    }
+
+    if (allSuccess)
+    {
+        result = bytesToHex(allData, 512);
     }
 
     // Power down NFC module to save power
@@ -154,26 +217,82 @@ bool RFIDController::writeData(const String &key, const String &data)
         return false;
     }
 
-    // Convert key from hex string to bytes
-    uint8_t keyBytes[6];
+    // Convert keys from hex string to bytes (96 bytes = 16 sectors x 6 bytes each)
+    uint8_t keyBytes[96];
     hexToBytes(key, keyBytes);
 
-    // Convert data from hex string to bytes
-    uint8_t dataBytes[16] = {0};
+    // Convert data from hex string to bytes (512 bytes = 16 sectors x 2 blocks x 16 bytes)
+    uint8_t dataBytes[512];
     hexToBytes(data, dataBytes);
 
-    bool result = false;
-    // Try to authenticate and write to block 4 (first data block)
-    if (authenticateBlock(4, keyBytes))
+    bool allSuccess = true;
+    int dataIndex = 0;
+
+    // Write to sectors 0-15, blocks 1 and 2 of each sector
+    for (int sector = 0; sector < 16; sector++)
     {
-        success = nfc->mifareclassic_WriteDataBlock(4, dataBytes);
-        result = success;
+        // Get the key for this sector (6 bytes per sector)
+        uint8_t sectorKey[6];
+        for (int i = 0; i < 6; i++)
+        {
+            sectorKey[i] = keyBytes[sector * 6 + i];
+        }
+
+        // Calculate block numbers for this sector
+        int block1 = sector * 4 + 1; // Block 1 of sector
+        int block2 = sector * 4 + 2; // Block 2 of sector
+
+        // Prepare data for block 1 (16 bytes)
+        uint8_t block1Data[16];
+        for (int i = 0; i < 16; i++)
+        {
+            block1Data[i] = dataBytes[dataIndex++];
+        }
+
+        // Authenticate and write block 1
+        if (authenticateBlock(block1, sectorKey))
+        {
+            success = nfc->mifareclassic_WriteDataBlock(block1, block1Data);
+            if (!success)
+            {
+                allSuccess = false;
+                break;
+            }
+        }
+        else
+        {
+            allSuccess = false;
+            break;
+        }
+
+        // Prepare data for block 2 (16 bytes)
+        uint8_t block2Data[16];
+        for (int i = 0; i < 16; i++)
+        {
+            block2Data[i] = dataBytes[dataIndex++];
+        }
+
+        // Authenticate and write block 2
+        if (authenticateBlock(block2, sectorKey))
+        {
+            success = nfc->mifareclassic_WriteDataBlock(block2, block2Data);
+            if (!success)
+            {
+                allSuccess = false;
+                break;
+            }
+        }
+        else
+        {
+            allSuccess = false;
+            break;
+        }
     }
 
     // Power down NFC module to save power
     powerDownNFC();
 
-    return result;
+    return allSuccess;
 }
 
 String RFIDController::getVersion()
@@ -181,10 +300,10 @@ String RFIDController::getVersion()
     return "1.0.0";
 }
 
-String RFIDController::bytesToHex(uint8_t *data, uint8_t length)
+String RFIDController::bytesToHex(uint8_t *data, uint16_t length)
 {
     String result = "";
-    for (uint8_t i = 0; i < length; i++)
+    for (uint16_t i = 0; i < length; i++)
     {
         if (data[i] < 0x10)
             result += "0";

@@ -30,7 +30,7 @@ ParsedCommand CommandParser::parse(const String &cmd)
     }
     else if (command == "READ")
     {
-        if (args.length() == 12 && isValidHexString(args, 12))
+        if (args.length() == 192 && isValidHexString(args, 192))
         {
             result.code = CommandCode::READ;
             result.arg1 = args;
@@ -46,9 +46,8 @@ ParsedCommand CommandParser::parse(const String &cmd)
             key.trim();
             data.trim();
 
-            if (key.length() == 12 && isValidHexString(key, 12) &&
-                data.length() <= 32 && data.length() > 0 &&
-                data.length() % 2 == 0 && isValidHexString(data, data.length()))
+            if (key.length() == 192 && isValidHexString(key, 192) &&
+                data.length() == 1024 && isValidHexString(data, 1024))
             {
                 result.code = CommandCode::WRITE;
                 result.arg1 = key;
