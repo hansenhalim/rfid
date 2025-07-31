@@ -143,7 +143,7 @@ This approach significantly reduces power consumption, making it suitable for ba
 
 - Commands are case-insensitive
 - All hex values in responses are uppercase
-- The implementation uses MIFARE Classic authentication with Key A
+- The implementation uses MIFARE Classic authentication with Key B
 - Data is read/written from blocks 1 and 2 of each sector (sectors 0-15)
 - Block 0 of each sector is typically reserved for sector headers/keys
 - Key size: 96 bytes (192 hex chars) for 16 sectors x 6 bytes each

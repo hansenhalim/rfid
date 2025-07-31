@@ -327,7 +327,7 @@ bool RFIDController::authenticateBlock(uint8_t blockNumber, uint8_t *key)
     if (!nfc)
         return false;
 
-    // Try to authenticate using key A
+    // Try to authenticate using key B
     uint8_t uid[] = {0, 0, 0, 0, 0, 0, 0};
     uint8_t uidLength;
 
@@ -336,5 +336,5 @@ bool RFIDController::authenticateBlock(uint8_t blockNumber, uint8_t *key)
     if (!success)
         return false;
 
-    return nfc->mifareclassic_AuthenticateBlock(uid, uidLength, blockNumber, 0, key);
+    return nfc->mifareclassic_AuthenticateBlock(uid, uidLength, blockNumber, 1, key);
 }
