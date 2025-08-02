@@ -61,7 +61,7 @@ bool RFIDController::initializeNFC()
     }
 
     // Set the max number of retry attempts to read from a card
-    nfc->setPassiveActivationRetries(0xFE);
+    nfc->setPassiveActivationRetries(0xFF);
 
     return true;
 }
