@@ -5,6 +5,19 @@
 #include <Adafruit_PN532.h>
 #include "Response.h"
 
+// Debug Configuration
+// Uncomment the line below to enable debug messages for development/debugging
+// Comment it out for production builds to remove all debug output
+// #define RFID_DEBUG_ENABLED
+
+#ifdef RFID_DEBUG_ENABLED
+#define RFID_DEBUG_PRINT(...) Serial.print(__VA_ARGS__)
+#define RFID_DEBUG_PRINTLN(...) Serial.println(__VA_ARGS__)
+#else
+#define RFID_DEBUG_PRINT(...)
+#define RFID_DEBUG_PRINTLN(...)
+#endif
+
 class RFIDController
 {
 public:
