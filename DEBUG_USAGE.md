@@ -44,18 +44,74 @@ When debug is enabled, you'll see detailed output like:
 
 ## What Gets Debugged
 
-The debug system currently covers the `readData()` function with detailed logging of:
+The debug system now covers all major RFID Controller functions with detailed logging:
 
-- Function entry and validation
-- NFC module power management
+### `begin()` Function
+
+- RFID Controller initialization
+- Pin configuration (reset pin setup)
+- NFC module power management setup
+- PN532 instance creation
+
+### `powerUpNFC()` Function
+
+- Power-up attempts and status
+- Reset pin state changes
+- Power-up timing and delays
+- NFC module initialization calls
+- Success/failure status
+
+### `powerDownNFC()` Function
+
+- Power-down operations
+- Reset pin state changes
+- Power state updates
+
+### `initializeNFC()` Function
+
+- NFC module initialization steps
+- Firmware version detection and display
+- Passive activation retry configuration
+- Initialization success/failure status
+
+### `scanUID()` Function
+
+- UID scanning operations
+- Card detection attempts
+- UID data display in hex format
+- UID conversion to hex string
+- Power management during scanning
+
+### `readData()` Function
+
+- Data read operation start/completion
 - Card detection and UID display
 - Key processing and validation
-- Sector-by-sector reading progress
-- Authentication attempts and results
-- Data reading success/failure
-- Block data in hex format
+- Sector-by-sector reading progress (16 sectors)
+- Authentication attempts for each block
+- Block data reading and hex display
 - Error conditions and failure points
-- Function completion status
+- Total bytes read tracking
+
+### `writeData()` Function
+
+- Data write operation start/completion
+- Card detection and UID display
+- Key and data length validation
+- Data conversion from hex to bytes
+- Sector-by-sector writing progress (16 sectors)
+- Block data preparation and hex display
+- Authentication attempts for each block
+- Write operation success/failure for each block
+- Total bytes written tracking
+
+### `authenticateBlock()` Function
+
+- Block authentication attempts
+- Authentication key display
+- UID retrieval for authentication
+- Authentication method (Key B)
+- Authentication success/failure results
 
 ## Benefits
 
