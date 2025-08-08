@@ -5,6 +5,7 @@ App::App() {}
 void App::setup()
 {
     // Serial configuration per API spec: 115200, 8N1, no flow control
+    Serial.setRxBufferSize(1024);
     Serial.begin(115200);
     while (!Serial)
         delay(10);
@@ -39,7 +40,7 @@ void App::handleCommand(const String &cmd)
         }
         else
         {
-            Response::sendError("NO_TAG");
+            Response::sendVerboseError("NO_TAG", "No RFID tag detected in range", "SCAN_UID operation");
         }
     }
     break;
@@ -53,7 +54,7 @@ void App::handleCommand(const String &cmd)
         }
         else
         {
-            Response::sendError("AUTH_FAILED");
+            Response::sendVerboseError("AUTH_FAILED", "Authentication failed or no tag present", "READ operation with provided key");
         }
     }
     break;
@@ -67,7 +68,7 @@ void App::handleCommand(const String &cmd)
         }
         else
         {
-            Response::sendError("WRITE_FAIL");
+            Response::sendVerboseError("WRITE_FAIL", "Failed to write data to RFID tag", "WRITE operation - check tag presence and key validity");
         }
     }
     break;
@@ -80,7 +81,7 @@ void App::handleCommand(const String &cmd)
     break;
 
     default:
-        Response::sendError("Unknown command");
+        Response::sendVerboseError("UNKNOWN_CMD", "Unrecognized command received", "Valid commands: SCAN_UID, READ, WRITE, VERSION");
         break;
     }
 }
