@@ -318,7 +318,7 @@ bool RFIDController::writeData(const String &key, const String &data)
 
 String RFIDController::getVersion()
 {
-    return "1.0.0";
+    return "1.0.1";
 }
 
 String RFIDController::bytesToHex(uint8_t *data, uint16_t length)
