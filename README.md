@@ -105,6 +105,73 @@ Return the firmware version of the RFID reader.
 < OK VERSION 1.0.0
 ```
 
+### HELP
+
+Get help information about available commands.
+
+**Request:** `HELP [command]`
+
+- `[command]`: Optional specific command to get detailed help for
+
+**Response:** `OK HELP <help_text>`
+
+**Examples:**
+
+```
+> HELP
+< OK HELP Available commands: SCAN_UID, READ <key>, WRITE <key> <data>, VERSION, HELP [command]. Use 'HELP <command>' for detailed help on specific commands.
+
+> HELP READ
+< OK HELP READ <192-hex-key> - Reads data from RFID tag using authentication key. Key must be exactly 192 hex characters (0-9, A-F). Example: READ A1B2C3D4E5F6...
+```
+
+## Enhanced Error Handling
+
+The system provides verbose error messages for invalid commands and inputs:
+
+### Error Code Reference
+
+- **UNKNOWN_CMD**: Command not recognized
+- **INVALID_ARGS**: Wrong number of arguments provided
+- **MISSING_ARGS**: Required arguments not provided
+- **INVALID_LENGTH**: Hex string has wrong length
+- **INVALID_HEX**: Non-hex characters found in hex string
+- **PARSE_ERROR**: General parsing error (fallback)
+
+### Error Message Examples
+
+#### Unknown Commands
+
+```
+> INVALID_COMMAND
+< ERR UNKNOWN_CMD - Unknown command 'INVALID_COMMAND'. Available commands: SCAN_UID, READ <key>, WRITE <key> <data>, VERSION, HELP [command]. Use 'HELP <command>' for detailed help on specific commands. (Command: 'INVALID_COMMAND')
+```
+
+#### Invalid Arguments
+
+```
+> SCAN_UID extra_arg
+< ERR INVALID_ARGS - SCAN_UID command takes no arguments. Usage: SCAN_UID (Command: 'SCAN_UID extra_arg')
+
+> READ
+< ERR MISSING_ARGS - READ command requires a 192-character hex key. Usage: READ <192-hex-key> (Command: 'READ')
+
+> READ ABC123
+< ERR INVALID_LENGTH - READ key must be exactly 192 hex characters. Provided: 6 characters (Command: 'READ ABC123')
+
+> WRITE
+< ERR MISSING_ARGS - WRITE command requires key and data. Usage: WRITE <192-hex-key> <1024-hex-data> (Command: 'WRITE')
+```
+
+### Error Message Features
+
+1. **Detailed Error Messages**: Each error explains exactly what went wrong
+2. **Usage Examples**: Error messages include correct usage syntax
+3. **Context Information**: Shows the original command that caused the error
+4. **Specific Error Codes**: Machine-readable error codes for programmatic handling
+5. **Help System**: Built-in help for all commands with examples
+6. **Validation**: Comprehensive input validation with specific feedback
+
 ## Building and Uploading
 
 1. Install PlatformIO Core or use PlatformIO IDE

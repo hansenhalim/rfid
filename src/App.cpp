@@ -29,6 +29,37 @@ void App::handleCommand(const String &cmd)
 {
     ParsedCommand parsed = CommandParser::parse(cmd);
 
+    // Handle parsing errors first
+    if (parsed.error != ParseError::NONE)
+    {
+        String errorCode;
+        switch (parsed.error)
+        {
+        case ParseError::UNKNOWN_COMMAND:
+            errorCode = "UNKNOWN_CMD";
+            break;
+        case ParseError::INVALID_ARGUMENT_COUNT:
+            errorCode = "INVALID_ARGS";
+            break;
+        case ParseError::INVALID_HEX_FORMAT:
+            errorCode = "INVALID_HEX";
+            break;
+        case ParseError::INVALID_HEX_LENGTH:
+            errorCode = "INVALID_LENGTH";
+            break;
+        case ParseError::MISSING_ARGUMENTS:
+            errorCode = "MISSING_ARGS";
+            break;
+        default:
+            errorCode = "PARSE_ERROR";
+            break;
+        }
+
+        Response::sendVerboseError(errorCode, parsed.errorDetails, "Command: '" + parsed.originalCommand + "'");
+        return;
+    }
+
+    // Handle valid commands
     switch (parsed.code)
     {
     case CommandCode::SCAN_UID:
@@ -80,8 +111,26 @@ void App::handleCommand(const String &cmd)
     }
     break;
 
+    case CommandCode::HELP:
+    {
+        if (parsed.arg1.length() > 0)
+        {
+            // Help for specific command
+            String helpText = CommandParser::getCommandHelp(parsed.arg1);
+            Response::sendOK("HELP " + helpText);
+        }
+        else
+        {
+            // General help
+            String helpText = CommandParser::getAllCommandsHelp();
+            Response::sendOK("HELP " + helpText);
+        }
+    }
+    break;
+
     default:
-        Response::sendVerboseError("UNKNOWN_CMD", "Unrecognized command received", "Valid commands: SCAN_UID, READ, WRITE, VERSION");
+        // This should not happen with the new parser, but keep as fallback
+        Response::sendVerboseError("UNKNOWN_CMD", "Unrecognized command received", "Valid commands: SCAN_UID, READ, WRITE, VERSION, HELP");
         break;
     }
 }
