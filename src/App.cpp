@@ -104,6 +104,20 @@ void App::handleCommand(const String &cmd)
     }
     break;
 
+    case CommandCode::ENROLL:
+    {
+        bool success = rfid.enrollKey(parsed.arg1);
+        if (success)
+        {
+            Response::sendOK("ENROLL_DONE");
+        }
+        else
+        {
+            Response::sendVerboseError("ENROLL_FAIL", "Failed to enroll keys to RFID tag", "ENROLL operation - check tag presence and authentication");
+        }
+    }
+    break;
+
     case CommandCode::VERSION:
     {
         String version = rfid.getVersion();

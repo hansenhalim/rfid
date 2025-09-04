@@ -116,6 +116,29 @@ ParsedCommand CommandParser::parse(const String &cmd)
         }
         result.code = CommandCode::VERSION;
     }
+    else if (command == "ENROLL")
+    {
+        if (args.length() == 0)
+        {
+            return createErrorResult(cmd, ParseError::MISSING_ARGUMENTS,
+                                     "ENROLL command requires a 96-byte hex key. Usage: ENROLL <96-hex-key>");
+        }
+
+        if (args.length() != 192)
+        {
+            return createErrorResult(cmd, ParseError::INVALID_HEX_LENGTH,
+                                     "ENROLL key must be exactly 192 hex characters (96 bytes). Provided: " + String(args.length()) + " characters");
+        }
+
+        if (!isValidHexString(args, 192))
+        {
+            return createErrorResult(cmd, ParseError::INVALID_HEX_FORMAT,
+                                     "ENROLL key contains invalid hex characters. Only 0-9, A-F, a-f allowed");
+        }
+
+        result.code = CommandCode::ENROLL;
+        result.arg1 = args;
+    }
     else if (command == "HELP")
     {
         result.code = CommandCode::HELP;
@@ -163,6 +186,10 @@ String CommandParser::getCommandHelp(const String &command)
     {
         return "VERSION - Returns the RFID reader firmware version. Takes no arguments. Example: VERSION";
     }
+    else if (command == "ENROLL")
+    {
+        return "ENROLL <96-hex-key> - Changes the fourth block (sector trailer) in each sector with new authentication keys. Key must be exactly 192 hex characters (96 bytes). Example: ENROLL A1B2C3D4E5F6...";
+    }
     else if (command == "HELP")
     {
         return "HELP [command] - Shows help information. Use without arguments for all commands, or specify a command for detailed help. Example: HELP READ";
@@ -175,7 +202,7 @@ String CommandParser::getCommandHelp(const String &command)
 
 String CommandParser::getAllCommandsHelp()
 {
-    return "Available commands: SCAN_UID, READ <key>, WRITE <key> <data>, VERSION, HELP [command]. Use 'HELP <command>' for detailed help on specific commands.";
+    return "Available commands: SCAN_UID, READ <key>, WRITE <key> <data>, ENROLL <key>, VERSION, HELP [command]. Use 'HELP <command>' for detailed help on specific commands.";
 }
 
 bool CommandParser::isValidHexString(const String &str, int expectedLength)

@@ -13,6 +13,7 @@ public:
     String scanUID();
     String readData(const String &key);
     bool writeData(const String &key, const String &data);
+    bool enrollKey(const String &key);
     String getVersion();
 
 private:

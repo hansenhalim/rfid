@@ -6,6 +6,7 @@ enum class CommandCode
     SCAN_UID,
     READ,
     WRITE,
+    ENROLL,
     VERSION,
     HELP,
     UNKNOWN

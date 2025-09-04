@@ -316,9 +316,114 @@ bool RFIDController::writeData(const String &key, const String &data)
     return allSuccess;
 }
 
+bool RFIDController::enrollKey(const String &key)
+{
+    if (!nfc)
+    {
+        return false;
+    }
+
+    // Power up NFC module for operation
+    if (!powerUpNFC())
+    {
+        return false;
+    }
+
+    uint8_t uid[] = {0, 0, 0, 0, 0, 0, 0};
+    uint8_t uidLength;
+
+    // First, find a card
+    bool success = nfc->readPassiveTargetID(PN532_MIFARE_ISO14443A, &uid[0], &uidLength);
+    if (!success)
+    {
+        powerDownNFC();
+        return false;
+    }
+
+    // Convert key from hex string to bytes (96 bytes = 16 sectors x 6 bytes each)
+    uint8_t keyBytes[96];
+    hexToBytes(key, keyBytes);
+
+    bool allSuccess = true;
+
+    // Write to block 3 (4th block) of each sector (0-15)
+    for (int sector = 0; sector < 16; sector++)
+    {
+        // Get the current key for this sector (6 bytes per sector)
+        uint8_t currentKey[6];
+        for (int i = 0; i < 6; i++)
+        {
+            currentKey[i] = keyBytes[sector * 6 + i];
+        }
+
+        // Calculate block 3 (sector trailer) for this sector
+        int block3 = sector * 4 + 3;
+
+        // Use factory default key for enrollment authentication
+        uint8_t factoryKey[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+        if (authenticateBlock(block3, factoryKey))
+        {
+            // Prepare the sector trailer data with the specified format
+            uint8_t sectorTrailerData[16];
+
+            // Set Key A based on sector: "A0A1A2A3A4A5" for sector 0, "D3F7D3F7D3F7" for others
+            if (sector == 0)
+            {
+                // Set Key A: A0A1A2A3A4A5 for sector 0
+                sectorTrailerData[0] = 0xA0;
+                sectorTrailerData[1] = 0xA1;
+                sectorTrailerData[2] = 0xA2;
+                sectorTrailerData[3] = 0xA3;
+                sectorTrailerData[4] = 0xA4;
+                sectorTrailerData[5] = 0xA5;
+            }
+            else
+            {
+                // Set Key A: D3F7D3F7D3F7 for all other sectors
+                sectorTrailerData[0] = 0xD3;
+                sectorTrailerData[1] = 0xF7;
+                sectorTrailerData[2] = 0xD3;
+                sectorTrailerData[3] = 0xF7;
+                sectorTrailerData[4] = 0xD3;
+                sectorTrailerData[5] = 0xF7;
+            }
+
+            // Set access bits: 1F01EE00 (default access bits)
+            sectorTrailerData[6] = 0x1F;
+            sectorTrailerData[7] = 0x01;
+            sectorTrailerData[8] = 0xEE;
+            sectorTrailerData[9] = 0x00;
+
+            // Set the 6-byte key for this sector (Key B)
+            for (int i = 0; i < 6; i++)
+            {
+                sectorTrailerData[10 + i] = keyBytes[sector * 6 + i];
+            }
+
+            // Write the sector trailer
+            success = nfc->mifareclassic_WriteDataBlock(block3, sectorTrailerData);
+            if (!success)
+            {
+                allSuccess = false;
+                break;
+            }
+        }
+        else
+        {
+            allSuccess = false;
+            break;
+        }
+    }
+
+    // Power down NFC module to save power
+    powerDownNFC();
+
+    return allSuccess;
+}
+
 String RFIDController::getVersion()
 {
-    return "1.0.1";
+    return "1.1.0";
 }
 
 String RFIDController::bytesToHex(uint8_t *data, uint16_t length)
