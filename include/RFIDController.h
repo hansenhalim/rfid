@@ -3,6 +3,7 @@
 #include <Wire.h>
 #include <SPI.h>
 #include <Adafruit_PN532.h>
+#include <map>
 #include "Response.h"
 
 class RFIDController
@@ -28,4 +29,7 @@ private:
     String bytesToHex(uint8_t *data, uint16_t length);
     void hexToBytes(const String &hex, uint8_t *bytes);
     bool authenticateBlock(uint8_t blockNumber, uint8_t *key);
+    bool isDataAllZeros(const String &data);
+    bool readTombstoneFlag(const String &key);
+    bool writeTombstoneFlag(const String &key, bool flagValue);
 };

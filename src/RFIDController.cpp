@@ -129,6 +129,19 @@ String RFIDController::readData(const String &key)
         return "";
     }
 
+    // Optimization: Check RFID tombstone flag first to avoid unnecessary reads
+    if (readTombstoneFlag(key))
+    {
+        powerDownNFC();
+        // Return 512 bytes of zeros (1024 hex characters)
+        String zeroData = "";
+        for (int i = 0; i < 1024; i++)
+        {
+            zeroData += "0";
+        }
+        return zeroData;
+    }
+
     // Convert keys from hex string to bytes (96 bytes = 16 sectors x 6 bytes each)
     uint8_t keyBytes[96];
     hexToBytes(key, keyBytes);
@@ -236,6 +249,19 @@ bool RFIDController::writeData(const String &key, const String &data)
     {
         powerDownNFC();
         return false;
+    }
+
+    // Check if writing all zeros - if so, only set tombstone flag and skip actual write
+    if (isDataAllZeros(data))
+    {
+        bool tombstoneResult = writeTombstoneFlag(key, true);
+        powerDownNFC();
+        return tombstoneResult;
+    }
+    else
+    {
+        // Clear tombstone flag for non-zero writes
+        writeTombstoneFlag(key, false);
     }
 
     // Convert keys from hex string to bytes (96 bytes = 16 sectors x 6 bytes each)
@@ -423,7 +449,7 @@ bool RFIDController::enrollKey(const String &key)
 
 String RFIDController::getVersion()
 {
-    return "1.1.0";
+    return "1.2.0";
 }
 
 String RFIDController::bytesToHex(uint8_t *data, uint16_t length)
@@ -469,4 +495,94 @@ bool RFIDController::authenticateBlock(uint8_t blockNumber, uint8_t *key)
     bool authResult = nfc->mifareclassic_AuthenticateBlock(uid, uidLength, blockNumber, 1, key);
 
     return authResult;
+}
+
+bool RFIDController::isDataAllZeros(const String &data)
+{
+    for (int i = 0; i < data.length(); i++)
+    {
+        if (data.charAt(i) != '0')
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool RFIDController::readTombstoneFlag(const String &key)
+{
+    if (!nfc)
+    {
+        return false;
+    }
+
+    // Convert keys from hex string to bytes
+    uint8_t keyBytes[96];
+    hexToBytes(key, keyBytes);
+
+    // Get the key for sector 1 (6 bytes per sector, so sector 1 starts at index 6)
+    uint8_t sectorKey[6];
+    for (int i = 0; i < 6; i++)
+    {
+        sectorKey[i] = keyBytes[6 + i]; // sector 1 key
+    }
+
+    // Sector 1, block 0 = block number 4
+    int tombstoneBlock = 4;
+
+    // Authenticate and read tombstone block
+    if (authenticateBlock(tombstoneBlock, sectorKey))
+    {
+        uint8_t blockData[16];
+        bool success = nfc->mifareclassic_ReadDataBlock(tombstoneBlock, blockData);
+        if (success)
+        {
+            // Check first byte for tombstone flag (0xAA = tombstoned, anything else = not tombstoned)
+            return (blockData[0] == 0xAA);
+        }
+    }
+    
+    return false; // Default to not tombstoned if read fails
+}
+
+bool RFIDController::writeTombstoneFlag(const String &key, bool flagValue)
+{
+    if (!nfc)
+    {
+        return false;
+    }
+
+    // Convert keys from hex string to bytes
+    uint8_t keyBytes[96];
+    hexToBytes(key, keyBytes);
+
+    // Get the key for sector 1 (6 bytes per sector, so sector 1 starts at index 6)
+    uint8_t sectorKey[6];
+    for (int i = 0; i < 6; i++)
+    {
+        sectorKey[i] = keyBytes[6 + i]; // sector 1 key
+    }
+
+    // Sector 1, block 0 = block number 4
+    int tombstoneBlock = 4;
+
+    // Authenticate and write tombstone block
+    if (authenticateBlock(tombstoneBlock, sectorKey))
+    {
+        uint8_t blockData[16];
+        
+        // Set first byte as tombstone flag
+        blockData[0] = flagValue ? 0xAA : 0x00; // 0xAA = tombstoned, 0x00 = not tombstoned
+        
+        // Fill rest with zeros
+        for (int i = 1; i < 16; i++)
+        {
+            blockData[i] = 0x00;
+        }
+
+        bool success = nfc->mifareclassic_WriteDataBlock(tombstoneBlock, blockData);
+        return success;
+    }
+    
+    return false;
 }
