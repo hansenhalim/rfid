@@ -129,8 +129,11 @@ String RFIDController::readData(const String &key)
         return "";
     }
 
-    // Optimization: Check RFID tombstone flag first to avoid unnecessary reads
-    if (readTombstoneFlag(key))
+    // Read payload length to determine how many blocks to read
+    uint16_t payloadLength = readPayloadLength(key);
+
+    // If payload length is 0, return all zeros
+    if (payloadLength == 0)
     {
         powerDownNFC();
         // Return 512 bytes of zeros (1024 hex characters)
@@ -142,6 +145,11 @@ String RFIDController::readData(const String &key)
         return zeroData;
     }
 
+    // Calculate number of sectors needed (each sector has 2 blocks x 16 bytes = 32 bytes)
+    int sectorsNeeded = (payloadLength + 31) / 32; // Round up
+    if (sectorsNeeded > 16) sectorsNeeded = 16; // Cap at maximum
+    if (sectorsNeeded == 0) sectorsNeeded = 1; // Read at least 1 sector
+
     // Convert keys from hex string to bytes (96 bytes = 16 sectors x 6 bytes each)
     uint8_t keyBytes[96];
     hexToBytes(key, keyBytes);
@@ -151,8 +159,8 @@ String RFIDController::readData(const String &key)
     int dataIndex = 0;
     bool allSuccess = true;
 
-    // Read from sectors 0-15, blocks 1 and 2 of each sector
-    for (int sector = 0; sector < 16; sector++)
+    // Read only the necessary sectors based on payload length
+    for (int sector = 0; sector < sectorsNeeded; sector++)
     {
         // Get the key for this sector (6 bytes per sector)
         uint8_t sectorKey[6];
@@ -218,6 +226,11 @@ String RFIDController::readData(const String &key)
 
     if (allSuccess)
     {
+        // Fill any unread bytes with zeros
+        for (int i = dataIndex; i < 512; i++)
+        {
+            allData[i] = 0x00;
+        }
         result = bytesToHex(allData, 512);
     }
 
@@ -251,18 +264,21 @@ bool RFIDController::writeData(const String &key, const String &data)
         return false;
     }
 
-    // Check if writing all zeros - if so, only set tombstone flag and skip actual write
-    if (isDataAllZeros(data))
+    // Calculate and store payload length
+    uint16_t payloadLength = calculatePayloadLength(data);
+    writePayloadLength(key, payloadLength);
+
+    // If payload length is 0 (all zeros), skip actual write
+    if (payloadLength == 0)
     {
-        bool tombstoneResult = writeTombstoneFlag(key, true);
         powerDownNFC();
-        return tombstoneResult;
+        return true;
     }
-    else
-    {
-        // Clear tombstone flag for non-zero writes
-        writeTombstoneFlag(key, false);
-    }
+
+    // Calculate number of sectors needed (each sector has 2 blocks x 16 bytes = 32 bytes)
+    int sectorsNeeded = (payloadLength + 31) / 32; // Round up
+    if (sectorsNeeded > 16) sectorsNeeded = 16; // Cap at maximum
+    if (sectorsNeeded == 0) sectorsNeeded = 1; // Write at least 1 sector
 
     // Convert keys from hex string to bytes (96 bytes = 16 sectors x 6 bytes each)
     uint8_t keyBytes[96];
@@ -275,8 +291,8 @@ bool RFIDController::writeData(const String &key, const String &data)
     bool allSuccess = true;
     int dataIndex = 0;
 
-    // Write to sectors 0-15, blocks 1 and 2 of each sector
-    for (int sector = 0; sector < 16; sector++)
+    // Write only the necessary sectors based on payload length
+    for (int sector = 0; sector < sectorsNeeded; sector++)
     {
         // Get the key for this sector (6 bytes per sector)
         uint8_t sectorKey[6];
@@ -449,7 +465,7 @@ bool RFIDController::enrollKey(const String &key)
 
 String RFIDController::getVersion()
 {
-    return "1.2.0";
+    return "1.3.0";
 }
 
 String RFIDController::bytesToHex(uint8_t *data, uint16_t length)
@@ -509,11 +525,12 @@ bool RFIDController::isDataAllZeros(const String &data)
     return true;
 }
 
-bool RFIDController::readTombstoneFlag(const String &key)
+
+uint16_t RFIDController::readPayloadLength(const String &key)
 {
     if (!nfc)
     {
-        return false;
+        return 512; // Default to full size if read fails
     }
 
     // Convert keys from hex string to bytes
@@ -528,24 +545,30 @@ bool RFIDController::readTombstoneFlag(const String &key)
     }
 
     // Sector 1, block 0 = block number 4
-    int tombstoneBlock = 4;
+    int metadataBlock = 4;
 
-    // Authenticate and read tombstone block
-    if (authenticateBlock(tombstoneBlock, sectorKey))
+    // Authenticate and read metadata block
+    if (authenticateBlock(metadataBlock, sectorKey))
     {
         uint8_t blockData[16];
-        bool success = nfc->mifareclassic_ReadDataBlock(tombstoneBlock, blockData);
+        bool success = nfc->mifareclassic_ReadDataBlock(metadataBlock, blockData);
         if (success)
         {
-            // Check first byte for tombstone flag (0xAA = tombstoned, anything else = not tombstoned)
-            return (blockData[0] == 0xAA);
+            // Payload length is stored in bytes 1-2 (big-endian)
+            uint16_t length = (blockData[1] << 8) | blockData[2];
+            // Ensure length is within valid range (0-512 bytes)
+            if (length > 512)
+            {
+                return 512; // Default to full size for invalid values
+            }
+            return length;
         }
     }
-    
-    return false; // Default to not tombstoned if read fails
+
+    return 512; // Default to full size if read fails
 }
 
-bool RFIDController::writeTombstoneFlag(const String &key, bool flagValue)
+bool RFIDController::writePayloadLength(const String &key, uint16_t length)
 {
     if (!nfc)
     {
@@ -564,25 +587,49 @@ bool RFIDController::writeTombstoneFlag(const String &key, bool flagValue)
     }
 
     // Sector 1, block 0 = block number 4
-    int tombstoneBlock = 4;
+    int metadataBlock = 4;
 
-    // Authenticate and write tombstone block
-    if (authenticateBlock(tombstoneBlock, sectorKey))
+    // Authenticate and write metadata block
+    if (authenticateBlock(metadataBlock, sectorKey))
     {
         uint8_t blockData[16];
-        
-        // Set first byte as tombstone flag
-        blockData[0] = flagValue ? 0xAA : 0x00; // 0xAA = tombstoned, 0x00 = not tombstoned
-        
-        // Fill rest with zeros
-        for (int i = 1; i < 16; i++)
+
+        // Initialize with zeros
+        for (int i = 0; i < 16; i++)
         {
             blockData[i] = 0x00;
         }
 
-        bool success = nfc->mifareclassic_WriteDataBlock(tombstoneBlock, blockData);
+        // Store payload length in bytes 1-2 (big-endian)
+        blockData[1] = (length >> 8) & 0xFF; // High byte
+        blockData[2] = length & 0xFF;        // Low byte
+
+        bool success = nfc->mifareclassic_WriteDataBlock(metadataBlock, blockData);
         return success;
     }
-    
+
     return false;
+}
+
+uint16_t RFIDController::calculatePayloadLength(const String &data)
+{
+    // Find the last non-zero character in the hex string
+    int lastNonZero = -1;
+    for (int i = data.length() - 1; i >= 0; i--)
+    {
+        if (data.charAt(i) != '0')
+        {
+            lastNonZero = i;
+            break;
+        }
+    }
+
+    if (lastNonZero == -1)
+    {
+        return 0; // All zeros
+    }
+
+    // Convert hex character position to byte count
+    // Each byte = 2 hex characters, so we need (lastNonZero + 1) / 2 rounded up
+    return (lastNonZero + 2) / 2;
 }

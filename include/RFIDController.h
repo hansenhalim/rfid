@@ -30,6 +30,7 @@ private:
     void hexToBytes(const String &hex, uint8_t *bytes);
     bool authenticateBlock(uint8_t blockNumber, uint8_t *key);
     bool isDataAllZeros(const String &data);
-    bool readTombstoneFlag(const String &key);
-    bool writeTombstoneFlag(const String &key, bool flagValue);
+    uint16_t readPayloadLength(const String &key);
+    bool writePayloadLength(const String &key, uint16_t length);
+    uint16_t calculatePayloadLength(const String &data);
 };
