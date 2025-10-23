@@ -105,6 +105,26 @@ Return the firmware version of the RFID reader.
 < OK VERSION 1.0.0
 ```
 
+### ENROLL <KEY>
+
+Enroll a new authentication key by updating sector trailers on an RFID tag.
+
+**Request:** `ENROLL <key>`
+
+- `<key>`: 192-character hex string (96 bytes - 16 sectors x 6 bytes each)
+
+**Response:**
+
+- Success: `OK ENROLL_DONE`
+- Error: `ERR AUTH_FAILED`, `ERR WRITE_FAIL`, or `ERR NO_TAG`
+
+**Example:**
+
+```
+> ENROLL A0A1A2A3A4A5B0B1B2B3B4B5C0C1C2C3C4C5D0D1D2D3D4D5E0E1E2E3E4E5F0F1F2F3F4F5000102030405101112131415202122232425303132333435404142434445505152535455606162636465707172737475808182838485909192939495A0A1A2A3A4A5B0B1B2B3B4B5
+< OK ENROLL_DONE
+```
+
 ### HELP
 
 Get help information about available commands.
@@ -119,7 +139,7 @@ Get help information about available commands.
 
 ```
 > HELP
-< OK HELP Available commands: SCAN_UID, READ <key>, WRITE <key> <data>, VERSION, HELP [command]. Use 'HELP <command>' for detailed help on specific commands.
+< OK HELP Available commands: SCAN_UID, READ <key>, WRITE <key> <data>, ENROLL <key>, VERSION, HELP [command]. Use 'HELP <command>' for detailed help on specific commands.
 
 > HELP READ
 < OK HELP READ <192-hex-key> - Reads data from RFID tag using authentication key. Key must be exactly 192 hex characters (0-9, A-F). Example: READ A1B2C3D4E5F6...
@@ -144,7 +164,7 @@ The system provides verbose error messages for invalid commands and inputs:
 
 ```
 > INVALID_COMMAND
-< ERR UNKNOWN_CMD - Unknown command 'INVALID_COMMAND'. Available commands: SCAN_UID, READ <key>, WRITE <key> <data>, VERSION, HELP [command]. Use 'HELP <command>' for detailed help on specific commands. (Command: 'INVALID_COMMAND')
+< ERR UNKNOWN_CMD - Unknown command 'INVALID_COMMAND'. Available commands: SCAN_UID, READ <key>, WRITE <key> <data>, ENROLL <key>, VERSION, HELP [command]. Use 'HELP <command>' for detailed help on specific commands. (Command: 'INVALID_COMMAND')
 ```
 
 #### Invalid Arguments
