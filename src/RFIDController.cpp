@@ -130,7 +130,7 @@ String RFIDController::readData(const String &key)
     }
 
     // Read payload length to determine how many blocks to read
-    uint16_t payloadLength = readPayloadLength(key);
+    uint16_t payloadLength = readPayloadLength(key, uid, uidLength);
 
     // If payload length is 0, return all zeros
     if (payloadLength == 0)
@@ -174,7 +174,7 @@ String RFIDController::readData(const String &key)
         int block2 = sector * 4 + 2; // Block 2 of sector
 
         // Authenticate and read block 1
-        if (authenticateBlock(block1, sectorKey))
+        if (nfc->mifareclassic_AuthenticateBlock(uid, uidLength, block1, 1, sectorKey))
         {
             uint8_t blockData[16];
             success = nfc->mifareclassic_ReadDataBlock(block1, blockData);
@@ -199,7 +199,7 @@ String RFIDController::readData(const String &key)
         }
 
         // Authenticate and read block 2
-        if (authenticateBlock(block2, sectorKey))
+        if (nfc->mifareclassic_AuthenticateBlock(uid, uidLength, block2, 1, sectorKey))
         {
             uint8_t blockData[16];
             success = nfc->mifareclassic_ReadDataBlock(block2, blockData);
@@ -266,7 +266,7 @@ bool RFIDController::writeData(const String &key, const String &data)
 
     // Calculate and store payload length
     uint16_t payloadLength = calculatePayloadLength(data);
-    writePayloadLength(key, payloadLength);
+    writePayloadLength(key, payloadLength, uid, uidLength);
 
     // If payload length is 0 (all zeros), skip actual write
     if (payloadLength == 0)
@@ -313,7 +313,7 @@ bool RFIDController::writeData(const String &key, const String &data)
         }
 
         // Authenticate and write block 1
-        if (authenticateBlock(block1, sectorKey))
+        if (nfc->mifareclassic_AuthenticateBlock(uid, uidLength, block1, 1, sectorKey))
         {
             success = nfc->mifareclassic_WriteDataBlock(block1, block1Data);
             if (!success)
@@ -336,7 +336,7 @@ bool RFIDController::writeData(const String &key, const String &data)
         }
 
         // Authenticate and write block 2
-        if (authenticateBlock(block2, sectorKey))
+        if (nfc->mifareclassic_AuthenticateBlock(uid, uidLength, block2, 1, sectorKey))
         {
             success = nfc->mifareclassic_WriteDataBlock(block2, block2Data);
             if (!success)
@@ -401,9 +401,18 @@ bool RFIDController::enrollKey(const String &key)
         // Calculate block 3 (sector trailer) for this sector
         int block3 = sector * 4 + 3;
 
-        // Use factory default key for enrollment authentication
+        // Try authenticating with factory default key using both Key A and Key B
+        // Try Key A first as it typically has write access to sector trailer with default access bits
         uint8_t factoryKey[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-        if (authenticateBlock(block3, factoryKey))
+        bool authenticated = nfc->mifareclassic_AuthenticateBlock(uid, uidLength, block3, 0, factoryKey);
+
+        if (!authenticated)
+        {
+            // Try Key B if Key A fails
+            authenticated = nfc->mifareclassic_AuthenticateBlock(uid, uidLength, block3, 1, factoryKey);
+        }
+
+        if (authenticated)
         {
             // Prepare the sector trailer data with the specified format
             uint8_t sectorTrailerData[16];
@@ -449,6 +458,18 @@ bool RFIDController::enrollKey(const String &key)
                 allSuccess = false;
                 break;
             }
+
+            // Re-select the card after writing sector trailer to reset authentication state
+            // This is necessary for genuine Mifare cards
+            if (sector < 15)
+            {
+                success = nfc->readPassiveTargetID(PN532_MIFARE_ISO14443A, &uid[0], &uidLength);
+                if (!success)
+                {
+                    allSuccess = false;
+                    break;
+                }
+            }
         }
         else
         {
@@ -465,7 +486,7 @@ bool RFIDController::enrollKey(const String &key)
 
 String RFIDController::getVersion()
 {
-    return "1.3.0";
+    return "1.3.1";
 }
 
 String RFIDController::bytesToHex(uint8_t *data, uint16_t length)
@@ -490,29 +511,6 @@ void RFIDController::hexToBytes(const String &hex, uint8_t *bytes)
     }
 }
 
-bool RFIDController::authenticateBlock(uint8_t blockNumber, uint8_t *key)
-{
-    if (!nfc)
-    {
-        return false;
-    }
-
-    // Try to authenticate using key B
-    uint8_t uid[] = {0, 0, 0, 0, 0, 0, 0};
-    uint8_t uidLength;
-
-    // We need to get the UID first for authentication
-    bool success = nfc->readPassiveTargetID(PN532_MIFARE_ISO14443A, &uid[0], &uidLength);
-    if (!success)
-    {
-        return false;
-    }
-
-    bool authResult = nfc->mifareclassic_AuthenticateBlock(uid, uidLength, blockNumber, 1, key);
-
-    return authResult;
-}
-
 bool RFIDController::isDataAllZeros(const String &data)
 {
     for (int i = 0; i < data.length(); i++)
@@ -526,7 +524,7 @@ bool RFIDController::isDataAllZeros(const String &data)
 }
 
 
-uint16_t RFIDController::readPayloadLength(const String &key)
+uint16_t RFIDController::readPayloadLength(const String &key, uint8_t *uid, uint8_t uidLength)
 {
     if (!nfc)
     {
@@ -548,7 +546,7 @@ uint16_t RFIDController::readPayloadLength(const String &key)
     int metadataBlock = 4;
 
     // Authenticate and read metadata block
-    if (authenticateBlock(metadataBlock, sectorKey))
+    if (nfc->mifareclassic_AuthenticateBlock(uid, uidLength, metadataBlock, 1, sectorKey))
     {
         uint8_t blockData[16];
         bool success = nfc->mifareclassic_ReadDataBlock(metadataBlock, blockData);
@@ -568,7 +566,7 @@ uint16_t RFIDController::readPayloadLength(const String &key)
     return 512; // Default to full size if read fails
 }
 
-bool RFIDController::writePayloadLength(const String &key, uint16_t length)
+bool RFIDController::writePayloadLength(const String &key, uint16_t length, uint8_t *uid, uint8_t uidLength)
 {
     if (!nfc)
     {
@@ -590,7 +588,7 @@ bool RFIDController::writePayloadLength(const String &key, uint16_t length)
     int metadataBlock = 4;
 
     // Authenticate and write metadata block
-    if (authenticateBlock(metadataBlock, sectorKey))
+    if (nfc->mifareclassic_AuthenticateBlock(uid, uidLength, metadataBlock, 1, sectorKey))
     {
         uint8_t blockData[16];
 

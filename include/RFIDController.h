@@ -28,9 +28,8 @@ private:
     bool initializeNFC();
     String bytesToHex(uint8_t *data, uint16_t length);
     void hexToBytes(const String &hex, uint8_t *bytes);
-    bool authenticateBlock(uint8_t blockNumber, uint8_t *key);
     bool isDataAllZeros(const String &data);
-    uint16_t readPayloadLength(const String &key);
-    bool writePayloadLength(const String &key, uint16_t length);
+    uint16_t readPayloadLength(const String &key, uint8_t *uid, uint8_t uidLength);
+    bool writePayloadLength(const String &key, uint16_t length, uint8_t *uid, uint8_t uidLength);
     uint16_t calculatePayloadLength(const String &data);
 };
